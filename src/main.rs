@@ -1,4 +1,5 @@
-use std::{path::PathBuf, process::Command};
+use std::{fs, path,io, process::Command};
+use zip::ZipArchive;
 
 use clap::Parser;  
 
@@ -10,8 +11,11 @@ pub struct Arguments {
     pub name: String, 
     /// Path to to check.
     #[arg(default_value = ".")] 
-    pub path: PathBuf, 
+    pub path: path::PathBuf, 
 }
+
+
+const DIST_DIR: &str = "./dist";
 
 // TODO
 // unpack built wheel
@@ -23,6 +27,35 @@ pub struct Arguments {
 // capture output of export command
 // replace the metdata Requires Dist with the lockfile output
 // generate new hashes? - check distinfo
+//
+
+fn build_wheel() {
+    if fs::metadata(DIST_DIR).is_ok() {
+        let _ = fs::remove_dir_all(DIST_DIR);
+    }
+
+    let _ = Command::new("uv")
+        .args(["build", "--wheel"])
+        .status()
+        .expect("Failed to build wheel using `uv build --wheel`");
+}
+
+fn unpack_wheel() -> io::Result<()> {
+    // Find wheel file
+    let wheel_path = fs::read_dir(DIST_DIR)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|p| p.extension().unwrap_or_default() == "whl")
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Wheel file not found"))?;
+
+    // Open and extract wheel
+    let file = fs::File::open(&wheel_path)?;
+    let mut archive = ZipArchive::new(file)?;
+    archive.extract(path::Path::new(DIST_DIR))?;
+    Ok(())
+}
+
+
 
 
 fn export_lock() {
@@ -65,6 +98,7 @@ fn main() {
     // let args = Arguments::parse();  
     // println!("{:?}", args);
 
-
+    build_wheel();
+    let _ = unpack_wheel();
     export_lock();
 }

@@ -29,7 +29,7 @@
             rust-analyzer
             lldb
             vscode-extensions.vadimcn.vscode-lldb
-
+            uv
           ];
         };
       }
